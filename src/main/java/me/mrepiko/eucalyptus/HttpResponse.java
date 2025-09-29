@@ -20,7 +20,9 @@ public class HttpResponse {
 
     @Nullable
     public JsonNode getBodyAsJsonNode() throws JsonProcessingException {
-        if (body == null) return null;
+        if (body == null) {
+            return null;
+        }
         return mapper.readTree(body);
     }
 

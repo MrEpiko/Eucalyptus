@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
-import lombok.NonNull;
 import okhttp3.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,16 +26,18 @@ public final class HttpRequestImpl implements HttpRequest {
     @Getter private final String url;
     @Getter private final HttpMethod method;
 
-    @Getter @Nullable private final String body;
+    @Getter @Nullable private final RequestBody body;
+    @Getter @Nullable private final String stringBody;
     @Nullable private final MediaType bodyMediaType;
     @Getter @Nullable private final Map<String, String> headers;
     @Getter @Nullable private final Map<String, String> params;
     @Nullable private final OkHttpClient client;
 
-    HttpRequestImpl(@NonNull Builder builder) {
+    HttpRequestImpl(@NotNull Builder builder) {
         this.url = builder.getUrl();
         this.method = builder.getMethod();
         this.body = builder.getBody();
+        this.stringBody = builder.getStringBody();
         this.bodyMediaType = builder.getBodyMediaType();
         this.headers = builder.getHeaders();
         this.params = builder.getParams();
@@ -46,7 +47,7 @@ public final class HttpRequestImpl implements HttpRequest {
     // Method implementations
 
     @Override
-    @NonNull
+    @NotNull
     public OkHttpClient getClient() {
         return (client != null) ? client : DefaultHttpRequestConfig.getDefaultClient();
     }
@@ -54,8 +55,10 @@ public final class HttpRequestImpl implements HttpRequest {
     @Override
     @Nullable
     public JsonNode getBodyAsNode() throws JsonProcessingException {
-        if (body == null) return null;
-        return mapper.readTree(body);
+        if (stringBody == null) {
+            return null;
+        }
+        return mapper.readTree(stringBody);
     }
 
     @Override
@@ -71,7 +74,7 @@ public final class HttpRequestImpl implements HttpRequest {
     }
 
     @Override
-    @NonNull
+    @NotNull
     public HttpResponse execute() throws IOException {
         Call call = getCall();
         response = call.execute();
@@ -79,7 +82,7 @@ public final class HttpRequestImpl implements HttpRequest {
     }
 
     @Override
-    @NonNull
+    @NotNull
     public CompletableFuture<HttpResponse> executeAsync() {
         CompletableFuture<HttpResponse> future = new CompletableFuture<>();
 
@@ -105,23 +108,29 @@ public final class HttpRequestImpl implements HttpRequest {
     }
 
     @Override
-    public void executeAsync(@NonNull Consumer<HttpResponse> consumer) {
+    public void executeAsync(@NotNull Consumer<HttpResponse> consumer) {
         executeAsync().whenComplete((resp, ex) -> {
-            if (ex != null) consumer.accept(new HttpResponse(520, null, null));
-            else consumer.accept(resp);
+            if (ex != null) {
+                consumer.accept(new HttpResponse(520, null, null));
+            }
+            else {
+                consumer.accept(resp);
+            }
         });
     }
 
     @Override
     public void close() {
-        if (response == null) return;
+        if (response == null) {
+            return;
+        }
         response.close();
         response = null;
     }
 
     // Helper methods
 
-    @NonNull
+    @NotNull
     private Call getCall() {
         Request.Builder builder = new Request.Builder();
         setupMethodAndBody(builder);
@@ -132,14 +141,14 @@ public final class HttpRequestImpl implements HttpRequest {
         return getClient().newCall(request);
     }
 
-    @NonNull
-    private HttpResponse getResponse(@NonNull Response response) throws IOException {
+    @NotNull
+    private HttpResponse getResponse(@NotNull Response response) throws IOException {
         this.response = response;
         String responseBody = (response.body() == null) ? null : response.body().string();
         return new HttpResponse(response.code(), responseBody, getHeaders(response.headers()));
     }
 
-    private void setupMethodAndBody(@NonNull Request.Builder builder) {
+    private void setupMethodAndBody(@NotNull Request.Builder builder) {
         switch (method) {
             case GET -> builder.get();
             case POST -> builder.post(getRequestBody());
@@ -152,7 +161,7 @@ public final class HttpRequestImpl implements HttpRequest {
         }
     }
 
-    private void setupParams(@NonNull Request.Builder builder) {
+    private void setupParams(@NotNull Request.Builder builder) {
         if (params == null) {
             builder.url(url);
             return;
@@ -170,19 +179,26 @@ public final class HttpRequestImpl implements HttpRequest {
         builder.url(urlBuilder.toString());
     }
 
-    private void setupHeaders(@NonNull Request.Builder builder) {
-        if (headers == null) return;
+    private void setupHeaders(@NotNull Request.Builder builder) {
+        if (headers == null) {
+            return;
+        }
         headers.forEach(builder::addHeader);
     }
 
-    @NonNull
+    @NotNull
     private RequestBody getRequestBody() {
-        return RequestBody.create(Objects.requireNonNullElse(body, ""), getBodyMediaType());
+        if (body != null) {
+            return body;
+        }
+        return RequestBody.create(Objects.requireNonNullElse(stringBody, ""), getBodyMediaType());
     }
 
     @Nullable
     private HashMap<String, String> getHeaders(@Nullable Headers headers) {
-        if (headers == null) return null;
+        if (headers == null) {
+            return null;
+        }
         HashMap<String, String> headersMap = new HashMap<>();
         headers.forEach(x -> headersMap.put(x.getFirst(), x.getSecond()));
         return headersMap;

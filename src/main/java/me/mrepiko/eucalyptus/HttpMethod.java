@@ -1,6 +1,7 @@
 package me.mrepiko.eucalyptus;
 
 import lombok.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 public enum HttpMethod {
     GET,
@@ -11,7 +12,7 @@ public enum HttpMethod {
     HEAD,
     OPTIONS;
 
-    public static HttpMethod fromString(@NonNull String method) {
+    public static HttpMethod fromString(@NotNull String method) {
         for (HttpMethod httpMethod : HttpMethod.values()) {
             if (httpMethod.name().equalsIgnoreCase(method)) {
                 return httpMethod;
