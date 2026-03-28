@@ -20,6 +20,7 @@ import java.util.function.Consumer;
 public final class HttpRequestImpl implements HttpRequest {
 
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final String ASYNC_ERROR_PREFIX = "[HttpRequestImpl] Async request failed";
 
     @Nullable private Response response;
 
@@ -94,12 +95,14 @@ public final class HttpRequestImpl implements HttpRequest {
                     HttpResponse httpResponse = getResponse(response);
                     future.complete(httpResponse);
                 } catch (Exception e) {
+                    logAsyncException(e);
                     future.completeExceptionally(e);
                 }
             }
 
             @Override
             public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                logAsyncException(e);
                 future.completeExceptionally(e);
             }
         });
@@ -111,10 +114,18 @@ public final class HttpRequestImpl implements HttpRequest {
     public void executeAsync(@NotNull Consumer<HttpResponse> consumer) {
         executeAsync().whenComplete((resp, ex) -> {
             if (ex != null) {
-                consumer.accept(new HttpResponse(520, null, null));
+                try {
+                    consumer.accept(new HttpResponse(520, null, null));
+                } catch (Throwable consumerError) {
+                    logAsyncException(consumerError);
+                }
+                return;
             }
-            else {
+
+            try {
                 consumer.accept(resp);
+            } catch (Throwable consumerError) {
+                logAsyncException(consumerError);
             }
         });
     }
@@ -202,6 +213,11 @@ public final class HttpRequestImpl implements HttpRequest {
         HashMap<String, String> headersMap = new HashMap<>();
         headers.forEach(x -> headersMap.put(x.getFirst(), x.getSecond()));
         return headersMap;
+    }
+
+    private void logAsyncException(@NotNull Throwable throwable) {
+        System.err.println(ASYNC_ERROR_PREFIX + ": " + throwable.getMessage());
+        throwable.printStackTrace(System.err);
     }
 
 }
